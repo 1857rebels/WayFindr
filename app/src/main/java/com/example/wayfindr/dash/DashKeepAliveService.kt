@@ -45,9 +45,11 @@ class DashKeepAliveService : Service() {
         }
 
         fun stop(context: Context) {
-            context.startService(
-                Intent(context, DashKeepAliveService::class.java).setAction(ACTION_STOP)
-            )
+            val i = Intent(context, DashKeepAliveService::class.java)
+            // startService() throws when the app is in the background and the service isn't
+            // running (e.g. stopping everything as the app goes to sleep): just stop it then.
+            runCatching { context.startService(i.setAction(ACTION_STOP)) }
+                .onFailure { context.stopService(Intent(context, DashKeepAliveService::class.java)) }
         }
     }
 

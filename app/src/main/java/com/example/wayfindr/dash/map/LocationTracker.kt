@@ -82,6 +82,7 @@ class LocationTracker(context: Context) {
     private fun reject(): Boolean { rejectStreak++; return false }
 
     private var running = false
+    val isRunning: Boolean get() = running
     private var handlerThread: android.os.HandlerThread? = null
 
     /** Requires ACCESS_FINE_LOCATION at runtime; no-ops without it. */

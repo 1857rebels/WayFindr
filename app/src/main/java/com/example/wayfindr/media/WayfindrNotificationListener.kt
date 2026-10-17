@@ -20,10 +20,12 @@ class WayfindrNotificationListener : NotificationListenerService() {
     // remote pull, the service is dead (toggle notification access off/on, or the requestRebind in
     // WayfindrApplication should have re-bound it).
     override fun onListenerConnected() {
+        bound = this
         com.example.wayfindr.data.RideDiagnostics.log("media", "notification listener CONNECTED")
     }
 
     override fun onListenerDisconnected() {
+        if (bound === this) bound = null
         com.example.wayfindr.data.RideDiagnostics.log("media", "notification listener DISCONNECTED")
     }
 
@@ -83,5 +85,13 @@ class WayfindrNotificationListener : NotificationListenerService() {
         return e.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
     }
 
-    companion object { private const val TAG = "NsNotifListener" }
+    companion object {
+        private const val TAG = "NsNotifListener"
+        @Volatile private var bound: WayfindrNotificationListener? = null
+
+        /** Ask Android to unbind the listener (app asleep); IdleSleep re-binds it on wake. */
+        fun unbindNow() {
+            bound?.let { runCatching { it.requestUnbind() } }
+        }
+    }
 }

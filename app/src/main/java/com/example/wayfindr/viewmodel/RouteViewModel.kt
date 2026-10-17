@@ -70,7 +70,16 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Reflect saves made locally OR synced in from another device.
         viewModelScope.launch { repo.revision.collect { reloadSaved() } }
+        // App asleep (10 min, no screen, no dash link): stop GPS; restart it on wake if it was on.
+        viewModelScope.launch {
+            com.example.wayfindr.util.IdleSleep.asleep.collect { asleep ->
+                if (asleep) { gpsBeforeSleep = locationTracker.isRunning; locationTracker.stop() }
+                else if (gpsBeforeSleep) { gpsBeforeSleep = false; locationTracker.start() }
+            }
+        }
     }
+
+    private var gpsBeforeSleep = false
 
     fun startLocationUpdates() = locationTracker.start()
 

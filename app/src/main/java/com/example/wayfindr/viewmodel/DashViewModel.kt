@@ -484,6 +484,16 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         viewModelScope.launch {
+            combine(wifiManager.state, session.state) { ws, st ->
+                ws.status == WifiConnStatus.CONNECTED || st == DashState.STREAMING
+            }.distinctUntilChanged().collect { com.example.wayfindr.util.IdleSleep.setDashLinked(it) }
+        }
+        viewModelScope.launch {
+            com.example.wayfindr.util.IdleSleep.asleep.collect { asleep ->
+                if (asleep && session.state.value != DashState.STREAMING) sleepNow()
+            }
+        }
+        viewModelScope.launch {
             wifiManager.state.collect { ws ->
                 com.example.wayfindr.data.RideDiagnostics.log(
                     "wifi",
@@ -725,6 +735,13 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         refreshStage()
         com.example.wayfindr.data.RideDiagnostics.log("error", "gave up: $reason — background released")
         com.example.wayfindr.data.RideDiagnostics.stop(reason)
+    }
+
+    /** App asleep (IdleSleep): stop any connect/reconnect attempt and release GPS, locks, loops. */
+    private fun sleepNow() {
+        com.example.wayfindr.data.RideDiagnostics.log("sleep", "app asleep — stopping background work")
+        if (userWantsConnection) giveUp("app asleep (idle ${com.example.wayfindr.util.IdleSleep.IDLE_MS / 60_000} min)")
+        else { wifiManager.disconnect(); releaseBackgroundResources() }
     }
 
     /** Start the give-up countdown if it isn't already running (idempotent). */

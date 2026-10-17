@@ -23,20 +23,8 @@ class WayfindrApplication : Application() {
         // that actually ran, not whatever is installed when we read it back; collect() reads prior exits.
         ExitInfoCollector.arm(this)
         ExitInfoCollector.collect(this)
-        // Reinstalling an APK leaves the NotificationListenerService UNBOUND even though the grant
-        // persists — which silently breaks now-playing + call mirroring. Ask the system to rebind it
-        // on every launch so an over-the-top install self-heals without the user re-toggling access.
-        rebindNotificationListener()
-    }
-
-    private fun rebindNotificationListener() {
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N) return
-        runCatching {
-            if (com.example.wayfindr.media.MediaInfoProvider.isAccessGranted(this)) {
-                android.service.notification.NotificationListenerService.requestRebind(
-                    android.content.ComponentName(this, com.example.wayfindr.media.WayfindrNotificationListener::class.java)
-                )
-            }
-        }
+        // Sleep after 10 min with no screen and no dash link. It also re-binds the notification
+        // listener whenever the app is opened (a reinstall leaves it unbound).
+        com.example.wayfindr.util.IdleSleep.init(this)
     }
 }

@@ -126,6 +126,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!-- 10-minute idle alarm: puts the app to sleep (util/IdleSleep). -->
+        <receiver
+            android:name=".util.IdleSleep$AlarmReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>
