@@ -409,30 +409,10 @@ keyPassword=…
 
 Without it, release builds fall back to the debug key.
 
-### 🔬 Under the hood
-
-```
- ┌──────────────┐   ┌──────────────┐   ┌───────────────┐   ┌─────────────┐   ┌──────────────┐
- │ Route        │──▶│ MapRenderer  │──▶│ DashEncoder   │──▶│ RTP / UDP   │──▶│ Console Dash │
- │ Google / OSM │   │ Canvas, 4 fps│   │ MediaCodec    │   │ port 5000   │   │ 526 × 300    │
- │ / BRouter    │   │ tiles+overlay│   │ H.264 ~200kbps│   │             │   │ round TFT    │
- └──────────────┘   └──────────────┘   └───────────────┘   └─────────────┘   └──────────────┘
-          control plane: "K1G" packets over UDP :2000 · RSA-1024 + AES-256 handshake
-```
-
-- **Kotlin + Jetpack Compose**, single-activity app; minimum Android 10 (Wi-Fi network
-  requests to the dash need API 29).
-- **Dash link:** joins the dash's Wi-Fi, completes the K1G handshake, then streams
-  526×300 H.264 Baseline at 4 fps with a keyframe every second, which is what the dash's
-  decoder keeps up with.
-- **Map:** raster tiles drawn with Android Canvas and cached on the phone; on a cache miss
-  it scales a neighbouring zoom level. The phone screens use MapLibre (OSM/offline) or the
-  Google Maps SDK.
-- **Turn arrows:** the dash draws its own glyphs; WayfindR sends glyph codes, distances,
-  ETA, compass heading, music and caller info as K1G fields.
-- **Data:** plain SQLite on the phone.
+### Honarable Mentions
 
 The dash protocol work builds on [**better-dash**](https://github.com/norbertFeron/better-dash).
+The app is inspired from [**Northstar**](https://github.com/adityadasika21/NorthStar).
 
 ---
 
