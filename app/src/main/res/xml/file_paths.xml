@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- App-private files (invoices + documents) exposed to external viewers via FileProvider. -->
+    <files-path name="invoices" path="invoices/" />
+    <files-path name="documents" path="documents/" />
+    <!-- Downloaded APK handed to the system package installer by the in-app updater. -->
+    <cache-path name="updates" path="updates/" />
+</paths>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 11+ package visibility: bind to the BRouter app's routing service (offline routing). -->
+    <queries>
+        <package android:name="btools.routingapp" />
+    </queries>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- startScan() to warm scan results so we resolve the exact dash SSID on the first try -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Android 13+: WiFi connection without location permission -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="tiramisu" />
+    <!-- Android 12 and below fallback -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Android 10+: Background location is required to keep GPS fresh with the screen OFF.
+         Without this, the OS throttles or stops location updates in the background even with
+         a foreground service running. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Keep streaming to the dash with the screen off -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Haptic cue when the dash link drops mid-ride (paired with the BT voice alert). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Cross-OEM background reliability: OxygenOS / One UI / MIUI / ColorOS kill the foreground
+         service (and freeze GPS) with the screen off unless the app is exempt from battery
+         optimization. We request the exemption via the standard system dialog so screen-off dash
+         streaming behaves the same on every device. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        tools:targetApi="34" />
+    <!-- Without the location FGS type, Android 14+ freezes GPS updates as soon as
+         the screen goes off — the rider position would stick at its first fix. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"
+        tools:targetApi="34" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Answer / reject the live call from the dash joystick (TelecomManager). Runtime-granted. -->
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <!-- In-app updater: download the new APK from GitHub Releases and hand it to the
+         system package installer (the install itself still needs the user's tap + the
+         per-app "install unknown apps" grant). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <!-- Backups disabled: app-private storage holds identity documents (insurance/RC with
+         their numbers) and service invoices. allowBackup=true would funnel those into
+         Google cloud auto-backup and adb backup. -->
+    <application
+        android:name=".WayfindrApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Wayfindr">
+
+
+        <!-- Google Maps SDK key, filled in at build time from secrets.properties (MAPS_API_KEY).
+             Without one it is "add gmaps api key here" and the app uses OSM maps instead. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Wayfindr"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Receive "Share" from Google Maps -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="maps.google.com" />
+                <data android:scheme="https" android:host="goo.gl" />
+                <data android:scheme="geo" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".dash.DashKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|location" />
+
+        <!-- Notification listener: grants MediaSessionManager access (now-playing → dash TLV 05 0d)
+             and reads CATEGORY_CALL notifications (caller name → dash TLV 05 22). User must enable it
+             once under Settings → Notification access; nothing is read until then. -->
+        <service
+            android:name=".media.WayfindrNotificationListener"
+            android:exported="false"
+            android:label="WayfindR media &amp; calls"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Shares stored service invoices (image/PDF) with an external viewer. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+</manifest>
