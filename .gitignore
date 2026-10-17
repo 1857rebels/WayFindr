@@ -1,0 +1,49 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+# Google Maps API key (MAPS_API_KEY=...), bring your own. NEVER commit it.
+secrets.properties
+
+# Firebase config (Firebase is not used; keep any stray copy out of git).
+google-services.json
+app/google-services.json
+
+# Distributable APKs live on GitHub Releases, not in the repo.
+/dist/
+*.apk
+# Per-version release folders (APK + changelog) kept locally, untracked.
+/version 1.3/
+
+# Release signing — the private key + its credentials. NEVER commit these.
+signing.properties
+wayfindr-signing.properties
+*.jks
+*.keystore
+
+# Local dev/test tooling (dash emulator + Firebase push/pull scripts). Kept on the author's
+# machine — it references a personal Firebase project and isn't part of the app. NEVER commit
+# the Firebase Admin service-account key it uses.
+/tools/
+serviceAccount.json
+node_modules/
+/.idea
+compile_log.txt
+
+# Ride/crash logs pulled off the phone (diag-backup-YYYY-MM-DD/). Personal data — keep local.
+/diag-backup-*/
+
+# Local AI-assistant notes; not part of the published project.
+CLAUDE.md
+.claude/

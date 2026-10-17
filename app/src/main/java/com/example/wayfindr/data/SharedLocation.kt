@@ -1,0 +1,21 @@
+package com.example.wayfindr.data
+
+data class SharedLocation(
+    val name: String,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val url: String? = null,
+    val needsExpansion: Boolean = false,
+)
+
+/** A destination the rider saved to navigate to again. Persisted in SQLite. */
+data class SavedLocation(
+    val id: Long = 0,
+    val name: String,
+    val lat: Double,
+    val lng: Double,
+    val waypoints: List<SharedLocation> = emptyList(),
+    val note: String = "",
+    val createdMs: Long = System.currentTimeMillis(),
+    val sid: String = "",       // stable record id (UUID)
+)
