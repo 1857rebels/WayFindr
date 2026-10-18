@@ -1,5 +1,6 @@
 import java.io.File
 import java.util.Properties
+import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.android.application)
@@ -42,12 +43,11 @@ android {
         // don't pretend to support it. Also makes the API-26 notification paths always safe.
         minSdk = 29
         targetSdk = 36
-        // 1.3.1 = hotfix for the MapLibre page-switch SIGSEGV that shipped in 1.3.0 (code 12).
-        // versionCode 13 > 12 so it installs in place as an update.
-        versionCode = 13
-        versionName = "1.3.1"
-        // Open-source builds are marked OSS everywhere: version shown in the app ("1.3.1-OSS")
-        // and the APK file name (Wayfindr-1.3.1-OSS-release.apk). The update check ignores the suffix.
+        // 1.3.2 (14): two editions, standard + full (see productFlavors below).
+        versionCode = 14
+        versionName = "1.3.2"
+        // Open-source builds are marked OSS everywhere: version shown in the app ("1.3.2-OSS",
+        // "1.3.2-OSS-full") and the APK names. The update check ignores the suffix.
         versionNameSuffix = "-OSS"
 
 
@@ -62,6 +62,25 @@ android {
         ndk { abiFilters += "arm64-v8a" }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Two editions, same app ID and key (switching keeps data):
+    //  - standard: no notification listener. Google Play Protect's enhanced fraud protection blocks
+    //    sideloaded apps that declare one, so this is the default download.
+    //  - full: adds the listener (src/full/AndroidManifest.xml) for now-playing and caller names on
+    //    the dash. Play Protect may block installing it from a browser or file manager.
+    flavorDimensions += "edition"
+    productFlavors {
+        create("standard") {
+            dimension = "edition"
+            isDefault = true
+            buildConfigField("boolean", "MEDIA_LISTENER", "false")
+        }
+        create("full") {
+            dimension = "edition"
+            versionNameSuffix = "-full"
+            buildConfigField("boolean", "MEDIA_LISTENER", "true")
+        }
     }
 
     signingConfigs {
@@ -112,6 +131,37 @@ android {
 
 base {
     archivesName = "Wayfindr-${android.defaultConfig.versionName}-OSS"
+}
+
+// One command for a release: `./gradlew releaseOss` (Windows: `gradlew releaseOss`).
+// Builds both editions' release APKs, copies them to dist/ as Wayfindr-<version>-OSS.apk and
+// Wayfindr-<version>-OSS-full.apk, and prints their checksums for the release notes.
+val ossVersion = android.defaultConfig.versionName
+val distDir = rootProject.layout.projectDirectory.dir("dist")
+tasks.register<Copy>("releaseOss") {
+    group = "distribution"
+    description = "Builds the standard and full release APKs and copies them to dist/."
+    dependsOn("assembleStandardRelease", "assembleFullRelease")
+    from(layout.buildDirectory.dir("outputs/apk/standard/release")) {
+        include("*.apk"); rename { "Wayfindr-$ossVersion-OSS.apk" }
+    }
+    from(layout.buildDirectory.dir("outputs/apk/full/release")) {
+        include("*.apk"); rename { "Wayfindr-$ossVersion-OSS-full.apk" }
+    }
+    into(distDir)
+    val outputs = listOf("Wayfindr-$ossVersion-OSS.apk", "Wayfindr-$ossVersion-OSS-full.apk")
+        .map { distDir.file(it).asFile }
+    doLast {
+        println()
+        println("Release APKs in dist/ (paste the sha256 lines into the release notes):")
+        outputs.forEach { f ->
+            val sha = MessageDigest.getInstance("SHA-256").digest(f.readBytes())
+                .joinToString("") { "%02x".format(it) }
+            val key = if (f.name.endsWith("-full.apk")) "sha256-full" else "sha256"
+            println("  ${f.name}  (${f.length() / (1024 * 1024)} MB)")
+            println("    $key: ${sha.take(12)}")
+        }
+    }
 }
 
 dependencies {

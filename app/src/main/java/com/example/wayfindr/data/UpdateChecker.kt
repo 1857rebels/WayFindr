@@ -41,9 +41,16 @@ object UpdateChecker {
         val sha256: String = "",   // 12-hex APK checksum, if the release notes publish one (see [shouldOffer])
     )
 
-    /** Pull a published APK checksum out of release notes, e.g. a line "sha256: 1caad8bed911". */
+    /** True in the full edition (with the notification listener); its APK name ends in "-full.apk". */
+    private val FULL = com.example.wayfindr.BuildConfig.MEDIA_LISTENER
+
+    /**
+     * Pull this edition's published APK checksum out of release notes: a line "sha256: 1caad8bed911"
+     * for the standard APK, "sha256-full: …" for the full one.
+     */
     private fun parseSha(body: String): String =
-        Regex("sha-?256[:\\s]+([0-9a-fA-F]{12,64})", RegexOption.IGNORE_CASE)
+        Regex(if (FULL) "sha-?256-full[:\\s]+([0-9a-fA-F]{12,64})" else "sha-?256(?!-full)[:\\s]+([0-9a-fA-F]{12,64})",
+            RegexOption.IGNORE_CASE)
             .find(body)?.groupValues?.get(1)?.lowercase()?.take(12).orEmpty()
 
     /**
@@ -89,14 +96,16 @@ object UpdateChecker {
             val tag = json.optString("tag_name").ifBlank { return null }
             val versionName = tag.removePrefix("v").removePrefix("V").trim()
 
-            // Find the first .apk asset.
+            // Find this edition's .apk asset (full: "...-full.apk"; standard: any other .apk).
             val assets = json.optJSONArray("assets")
             var apkUrl = ""
             var apkSize = 0L
             if (assets != null) {
                 for (i in 0 until assets.length()) {
                     val a = assets.getJSONObject(i)
-                    if (a.optString("name").endsWith(".apk", ignoreCase = true)) {
+                    val name = a.optString("name")
+                    if (name.endsWith(".apk", ignoreCase = true) &&
+                        name.endsWith("-full.apk", ignoreCase = true) == FULL) {
                         apkUrl = a.optString("browser_download_url")
                         apkSize = a.optLong("size", 0L)
                         break

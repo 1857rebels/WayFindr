@@ -182,7 +182,15 @@ fun SettingsScreen(
         val callPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             callAnswerGranted = it
         }
-        WayfindrCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+        if (!com.example.wayfindr.BuildConfig.MEDIA_LISTENER) WayfindrCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+            SettingRow(
+                WayfindrIcons.Zap,
+                "Now playing & calls on dash",
+                "Not in this edition. Install WayfindR full (from Releases) for song info and caller names on the dash.",
+                control = { WayfindrChip("Full only", ChipTone.Off, dot = true) },
+                last = true,
+            )
+        } else WayfindrCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             SettingRow(
                 WayfindrIcons.Zap,
                 "Now playing & calls on dash",

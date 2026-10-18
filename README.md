@@ -59,7 +59,7 @@ the entire ride**.
 | **Routing badge** | A small **G / O / BR** box shows which router planned the current route. |
 | **Auto night map** | Dark map from 7 pm to 5 am automatically, or set light/dark by hand. |
 | **Rider status** | Phone battery and charging, "GPS weak" / "GPS lost" pills, and the dash's compass heading. |
-| **Music and calls** | Now-playing appears in the dash's own music widget; incoming calls show the caller's name, and you can reject from the joystick. |
+| **Music and calls** *(full edition)* | Now-playing appears in the dash's own music widget; incoming calls show the caller's name, and you can reject from the joystick. |
 | **Voice** | Off, a chime before turns, or full spoken directions (on-device text-to-speech). |
 
 ### 📱 On the phone
@@ -103,13 +103,35 @@ Choose each one independently, on the phone's Route screen or from the [dash men
 
 ## 📦 Install
 
-1. Download the latest APK from **[Releases](https://github.com/1857rebels/WayFindr/releases/latest)**.
+Each release has two APKs on the **[Releases](https://github.com/1857rebels/WayFindr/releases/latest)** page:
+
+| APK | What's in it | Installing |
+|---|---|---|
+| **`Wayfindr-<version>-OSS.apk`** *(recommended)* | Everything except music and caller names on the dash | Installs normally |
+| `Wayfindr-<version>-OSS-full.apk` | Everything, plus now-playing and caller names on the dash | Google Play Protect may block it; see below |
+
+1. Download the APK you want.
 2. Open it on your phone and allow "install unknown apps" when asked.
 3. Turn on the bike, open WayfindR and tap **Open dash view**. It finds the dash's `RE_…`
    Wi-Fi network by itself and remembers it.
 
-Releases are signed with the same key, so new versions install over the old one and keep
-your data.
+Both editions use the same app ID and signing key, so new versions install over the old one
+and keep your data, and you can switch editions the same way.
+
+<details>
+<summary><b>Installing the full edition when Play Protect blocks it</b></summary>
+
+The full edition needs **notification access**, to read the song playing and the caller's name.
+In some countries Google Play Protect blocks any sideloaded app that asks for it, with "App
+blocked to protect your device" and no *Install anyway* button. Either:
+
+- **Install over USB** from a computer: `adb install Wayfindr-<version>-OSS-full.apk`, or
+- **Pause Play Protect while installing:** Play Store → profile icon → *Play Protect* → ⚙ →
+  turn off *Scan apps with Play Protect*, install the APK, then turn it back on.
+
+Then, on Android 13 and newer: *Settings → Apps → WayfindR → ⋮ → Allow restricted settings*,
+and turn on WayfindR under *Settings → Notification access* (or from WayfindR's own Settings).
+</details>
 
 > [!TIP]
 > Get notified of new versions with **[Obtainium](https://github.com/ImranR98/Obtainium)**:
@@ -394,8 +416,19 @@ cd WayFindr
 ./gradlew :app:assembleDebug
 ```
 
-The APK lands in `app/build/outputs/apk/debug/`. No keys or accounts are needed; add
-`secrets.properties` for [Google](#-optional-google-maps-key).
+The APKs land in `app/build/outputs/apk/<edition>/debug/` (`standard` and `full`). No keys or
+accounts are needed; add `secrets.properties` for [Google](#-optional-google-maps-key).
+
+**Both release APKs in one command:**
+
+```bash
+./gradlew releaseOss
+```
+
+On Windows PowerShell use `.\gradlew releaseOss`. It builds the standard and full release APKs,
+copies them to `dist/` as `Wayfindr-<version>-OSS.apk` and `Wayfindr-<version>-OSS-full.apk`,
+and prints a `sha256:` / `sha256-full:` line for each to paste into the release notes (the in-app
+update check uses them). Bump `versionCode` and `versionName` in `app/build.gradle.kts` first.
 
 **Release builds** are signed with the key described in a git-ignored
 `wayfindr-signing.properties` at the repo root:

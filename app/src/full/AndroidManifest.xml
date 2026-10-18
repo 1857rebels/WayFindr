@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Full edition only: the notification listener for now-playing and caller names on the dash.
+     Kept out of the standard edition because Play Protect blocks sideloaded apps that declare it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!-- Notification listener: grants MediaSessionManager access (now-playing → dash TLV 05 0d)
+             and reads CATEGORY_CALL notifications (caller name → dash TLV 05 22). User must enable it
+             once under Settings → Notification access; nothing is read until then. -->
+        <service
+            android:name=".media.WayfindrNotificationListener"
+            android:exported="false"
+            android:label="WayfindR media &amp; calls"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>

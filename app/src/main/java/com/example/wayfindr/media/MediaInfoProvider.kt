@@ -95,6 +95,8 @@ class MediaInfoProvider(private val context: Context) {
 
         /** True once the user enables Wayfindr under Settings → Notification access. */
         fun isAccessGranted(context: Context): Boolean {
+            // The standard edition has no notification listener at all (see app/build.gradle.kts).
+            if (!com.example.wayfindr.BuildConfig.MEDIA_LISTENER) return false
             val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
                 ?: return false
             return flat.split(":").any { it.contains(context.packageName) }
