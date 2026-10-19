@@ -64,6 +64,7 @@ fun RouteScreen(
     var sent by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<com.example.wayfindr.data.SavedLocation?>(null) }
+    var sharing by remember { mutableStateOf<com.example.wayfindr.data.SavedLocation?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     val searchSource by remember { com.example.wayfindr.dash.DashConfig.get(ctx) }.routingSource.collectAsState()
 
@@ -93,6 +94,11 @@ fun RouteScreen(
     val navPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { sent = true }
+
+    // Photo picker: no storage permission needed.
+    val qrPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) routeViewModel.importQrImage(uri)
+    }
 
     val locationPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -160,7 +166,11 @@ fun RouteScreen(
                 )
                 Spacer(Modifier.width(12.dp))
                 WayfindrChip(
-                    if (routeState.isResolving) "Resolving link…" else "Shared from Google Maps",
+                    when {
+                        routeState.isResolving -> "Resolving link…"
+                        routeState.fromWayfindr -> "Shared from Wayfindr"
+                        else -> "Shared from Google Maps"
+                    },
                     tone = if (routeState.isResolving) ChipTone.Gold else ChipTone.Neutral,
                     icon = WayfindrIcons.Share,
                     modifier = Modifier.background(Color(0xB30D0F11), CircleShape),
@@ -238,6 +248,41 @@ fun RouteScreen(
             }
             routeState.searchNote?.let { note ->
                 Text(note, color = TextLo, fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp, bottom = 12.dp))
+            }
+            WayfindrBtn(
+                label = "Load route from QR image",
+                onClick = {
+                    qrPicker.launch(androidx.activity.result.PickVisualMediaRequest(
+                        ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+                icon = WayfindrIcons.QrScan,
+                variant = BtnVariant.Ghost,
+                size = BtnSize.Sm,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            )
+
+            // A route another Wayfindr rider shared, not saved here yet → offer to keep it.
+            routeState.sharedRouteName?.let { sharedName ->
+                WayfindrCard(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), padding = 14.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(WayfindrIcons.Share, contentDescription = null, tint = Gold, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(sharedName, color = TextHi, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                                fontFamily = GeistFamily, maxLines = 1)
+                            Text("Shared route · ${routeState.waypoints.size} " +
+                                if (routeState.waypoints.size == 1) "stop" else "stops",
+                                color = TextMid, fontSize = 12.sp, fontFamily = GeistFamily)
+                        }
+                        WayfindrBtn(
+                            label = "Save",
+                            onClick = { showSave = true },
+                            icon = WayfindrIcons.Pin,
+                            variant = BtnVariant.Secondary,
+                            size = BtnSize.Sm,
+                        )
+                    }
+                }
             }
 
             // No destination yet → tell the rider exactly how to start one.
@@ -472,6 +517,11 @@ fun RouteScreen(
                                 )
                             }
                             Icon(
+                                WayfindrIcons.Share, "Share ${loc.name}", tint = TextLo,
+                                modifier = Modifier.padding(end = 14.dp).size(18.dp)
+                                    .clickable { sharing = loc },
+                            )
+                            Icon(
                                 WayfindrIcons.Edit, "edit", tint = TextLo,
                                 modifier = Modifier.size(18.dp).clickable { editing = loc },
                             )
@@ -483,10 +533,11 @@ fun RouteScreen(
     }
 
     if (showSave) SaveLocationDialog(
-        defaultName = destName,
+        defaultName = routeState.sharedRouteName ?: destName,
         onSave = { name, note -> routeViewModel.saveCurrentDestination(name, note); showSave = false },
         onDismiss = { showSave = false },
     )
+    sharing?.let { loc -> RouteQrDialog(loc, onDismiss = { sharing = null }) }
     editing?.let { loc ->
         EditLocationDialog(
             loc = loc,

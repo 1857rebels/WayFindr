@@ -96,6 +96,13 @@
                 <data android:scheme="https" android:host="goo.gl" />
                 <data android:scheme="geo" />
             </intent-filter>
+            <!-- Routes shared from another Wayfindr (util/RouteShare): wayfindr://route?… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="wayfindr" android:host="route" />
+            </intent-filter>
         </activity>
 
         <service

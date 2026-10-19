@@ -36,6 +36,8 @@ fun HomeScreen(
     routeViewModel: RouteViewModel = viewModel(),
 ) {
     val saved by routeViewModel.saved.collectAsState()
+    var sharing by remember { mutableStateOf<com.example.wayfindr.data.SavedLocation?>(null) }
+    sharing?.let { loc -> RouteQrDialog(loc, onDismiss = { sharing = null }) }
     val status = when (conn) {
         ConnectionState.Connected -> Triple("Connected", "Streaming to Console Dash", Gold)
         ConnectionState.Searching -> Triple("Searching…", "Looking for Console Dash", Warn)
@@ -177,12 +179,21 @@ fun HomeScreen(
             WayfindrCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
                 saved.forEachIndexed { i, loc ->
                     if (i > 0) WayfindrDivider(Modifier.padding(horizontal = 4.dp))
-                    WayfindrRow(
-                        loc.name, icon = WayfindrIcons.LocationPin,
-                        sub = loc.note.ifBlank { "%.4f, %.4f".format(loc.lat, loc.lng) },
-                        trailingIcon = true,
-                        onClick = { routeViewModel.selectSaved(loc); onNavigate("route") },
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        WayfindrRow(
+                            loc.name, icon = WayfindrIcons.LocationPin,
+                            sub = loc.note.ifBlank { "%.4f, %.4f".format(loc.lat, loc.lng) },
+                            trailingIcon = true,
+                            onClick = { routeViewModel.selectSaved(loc); onNavigate("route") },
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            WayfindrIcons.Share, "Share ${loc.name}", tint = TextLo,
+                            modifier = Modifier.clip(CircleShape)
+                                .clickable { sharing = loc }
+                                .padding(12.dp).size(18.dp),
+                        )
+                    }
                 }
             }
         }

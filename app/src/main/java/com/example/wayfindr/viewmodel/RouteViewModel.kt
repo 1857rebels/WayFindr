@@ -41,6 +41,10 @@ data class RouteState(
     val etaText: String? = null,        // "13:32"
     /** Why the last search found nothing (shown under the search box); null = fine. */
     val searchNote: String? = null,
+    /** Name of a route another Wayfindr rider shared and that isn't saved here yet; offers "Save". */
+    val sharedRouteName: String? = null,
+    /** The stops came from a Wayfindr QR/link (not Google Maps); labels the Route screen. */
+    val fromWayfindr: Boolean = false,
 )
 
 class RouteViewModel(app: Application) : AndroidViewModel(app) {
@@ -112,6 +116,7 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { repo.addSavedItinerary(name.ifBlank { stops.last().name }, stops, note) }
         }
+        _state.value = _state.value.copy(sharedRouteName = null)
     }
 
     fun renameSaved(loc: com.example.wayfindr.data.SavedLocation, name: String, note: String) =
@@ -127,12 +132,30 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
         }
         _state.value = _state.value.copy(
             destination = stops.last(), waypoints = stops, isResolving = false,
-            pendingNavigate = false, route = null,
+            pendingNavigate = false, route = null, sharedRouteName = null,
         )
         computeRoute(stops)
     }
 
     fun handleSharedText(text: String) {
+        // A route shared from another Wayfindr (wayfindr:// link from a scanned QR): every stop
+        // with its name and coordinates, so nothing to resolve. Checked before the Maps-link parsers.
+        com.example.wayfindr.util.RouteShare.decode(text)?.let { shared ->
+            val alreadySaved = _saved.value.any { saved ->
+                val s = com.example.wayfindr.util.RouteShare.stopsOf(saved)
+                s.size == shared.stops.size && s.zip(shared.stops).all { (a, b) ->
+                    Math.abs(a.lat!! - b.lat!!) < 1e-5 && Math.abs(a.lng!! - b.lng!!) < 1e-5
+                }
+            }
+            Dbg.i(TAG) { "Wayfindr route '${shared.name}' (saved=$alreadySaved): " +
+                shared.stops.joinToString(" → ") { "${it.name} ${it.lat},${it.lng}" } }
+            _state.value = freshState(RouteState(
+                destination = shared.stops.last(), waypoints = shared.stops, pendingNavigate = true,
+                sharedRouteName = if (alreadySaved) null else shared.name, fromWayfindr = true,
+            ))
+            computeRoute(shared.stops)
+            return
+        }
         // Google Maps direction shares can include several stops. Parse those before the
         // legacy single-place parser, whose coordinate extraction deliberately returns one match.
         val directStops = LocationParser.parseStops(text)
@@ -141,12 +164,12 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val loc = LocationParser.parse(text)
-        _state.value = RouteState(
+        _state.value = freshState(RouteState(
             destination = loc,
             waypoints = if (loc.lat != null && loc.lng != null) listOf(loc) else emptyList(),
             isResolving = loc.needsExpansion,
             pendingNavigate = true,
-        )
+        ))
         if (loc.lat != null && loc.lng != null) {
             computeRoute(listOf(loc))
         } else if (loc.url != null) {
@@ -167,14 +190,32 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 // Named places (e.g. "Third Wave Coffee, … Hyderabad") have no coords in
                 // the URL — geocode the resolved address to get lat/lng.
-                val coords = urlCoords ?: resolvedName?.let { geocode(it) }
+                val coords = urlCoords ?: resolvedName?.let { geocode(it) } ?: savedByName(name)
                 val resolved = loc.copy(
                     name = name, lat = coords?.first, lng = coords?.second, needsExpansion = false,
                 )
-                _state.value = _state.value.copy(destination = resolved, waypoints = listOf(resolved), isResolving = false)
-                if (coords != null) computeRoute(listOf(resolved))
-                else Log.w(TAG, "No coords for '$name' (url+geocode both empty)")
+                if (coords != null) {
+                    _state.value = _state.value.copy(destination = resolved, waypoints = listOf(resolved), isResolving = false)
+                    computeRoute(listOf(resolved))
+                } else {
+                    // Keep the name on screen but no stop without coordinates.
+                    _state.value = _state.value.copy(destination = resolved, waypoints = emptyList(), isResolving = false,
+                        searchNote = "Couldn't open the Google Maps link (no internet?). " +
+                            "Search a saved place or tap the map.")
+                    Log.w(TAG, "No coords for '$name' (url+geocode+saved all empty)")
+                }
             }
+        }
+    }
+
+    /** Load a route from a Wayfindr QR code in a picked image (saved share image or screenshot). */
+    fun importQrImage(uri: android.net.Uri) {
+        _state.value = _state.value.copy(searchNote = null)
+        viewModelScope.launch {
+            val text = withContext(Dispatchers.Default) { com.example.wayfindr.util.RouteQr.read(getApplication(), uri) }
+            if (text != null && com.example.wayfindr.util.RouteShare.decode(text) != null) handleSharedText(text)
+            else _state.value = _state.value.copy(searchNote =
+                if (text == null) "No QR code found in that image." else "That QR code isn't a Wayfindr route.")
         }
     }
 
@@ -236,7 +277,27 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onNavigated() { _state.value = _state.value.copy(pendingNavigate = false) }
-    fun clear() { _state.value = RouteState() }
+    fun clear() { _state.value = freshState(RouteState()) }
+
+    /**
+     * A reset screen state that keeps the rider's position. Dropping it left the map with nothing
+     * to centre on until the next GPS update, so an offline share (no route to frame) showed the
+     * map's default 0°,0° — a blank blue sea (2026-10-19).
+     */
+    @SuppressLint("MissingPermission")
+    private fun freshState(next: RouteState): RouteState {
+        val old = _state.value
+        val here = old.currentLocation
+            ?: locationTracker.lastKnown()?.let { it.latitude to it.longitude }
+        return next.copy(currentLocation = here, currentBearing = old.currentBearing,
+            locationRefreshKey = old.locationRefreshKey)
+    }
+
+    /** No internet to open a shared link or geocode a name: try the saved places by name. */
+    private fun savedByName(name: String): Pair<Double, Double>? =
+        name.takeIf { it.isNotBlank() && it != "Shared location" && it != "Loading…" && it != "Dropped pin" }
+            ?.let { com.example.wayfindr.dash.nav.PlaceSearch.savedMatch(it, _saved.value) }
+            ?.let { it.lat to it.lng }
 
     /** Clear the loaded itinerary without dropping the live location shown on the map. */
     fun clearDestinations() {
@@ -249,6 +310,7 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
             distanceText = null,
             durationText = null,
             etaText = null,
+            sharedRouteName = null,
         )
     }
 
@@ -284,16 +346,16 @@ class RouteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun loadSharedStops(stops: List<SharedLocation>, pendingNavigate: Boolean) {
-        _state.value = RouteState(
+        _state.value = freshState(RouteState(
             destination = stops.last(),
             waypoints = stops,
             isResolving = true,
             pendingNavigate = pendingNavigate,
-        )
+        ))
         viewModelScope.launch {
             val resolved = stops.map { stop ->
                 if (stop.lat != null && stop.lng != null) stop
-                else geocode(stop.name)?.let { (lat, lng) ->
+                else (geocode(stop.name) ?: savedByName(stop.name))?.let { (lat, lng) ->
                     stop.copy(lat = lat, lng = lng, needsExpansion = false)
                 } ?: stop.copy(needsExpansion = false)
             }

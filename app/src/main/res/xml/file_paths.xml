@@ -5,4 +5,6 @@
     <files-path name="documents" path="documents/" />
     <!-- Downloaded APK handed to the system package installer by the in-app updater. -->
     <cache-path name="updates" path="updates/" />
+    <!-- Route QR image handed to a messaging app from the share dialog (util/RouteQr). -->
+    <cache-path name="route_qr" path="route_qr/" />
 </paths>

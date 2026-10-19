@@ -35,6 +35,8 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.Sync
@@ -82,6 +84,8 @@ object WayfindrIcons {
     val Cal           = Icons.Outlined.CalendarToday
     val Pin           = Icons.Outlined.Route
     val Share         = Icons.Outlined.Share
+    val Download      = Icons.Outlined.Download
+    val QrScan        = Icons.Outlined.QrCodeScanner
     val Power         = Icons.Outlined.PowerSettingsNew
     val Lock          = Icons.Outlined.Lock
     val Mail          = Icons.Outlined.Email

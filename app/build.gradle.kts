@@ -181,6 +181,8 @@ dependencies {
     implementation(libs.play.services.maps)
     implementation(libs.maplibre)
     implementation(libs.maplibre.annotation)
+    // QR codes for shared routes (util/RouteQr) - pure Java, works offline.
+    implementation(libs.zxing.core)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
