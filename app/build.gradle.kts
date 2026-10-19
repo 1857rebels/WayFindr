@@ -44,8 +44,9 @@ android {
         minSdk = 29
         targetSdk = 36
         // 1.3.2 (14): two editions, standard + full (see productFlavors below).
-        versionCode = 14
-        versionName = "1.3.2"
+        // 1.3.3 (15): share saved destinations as QR codes; offline share fallbacks.
+        versionCode = 15
+        versionName = "1.3.3"
         // Open-source builds are marked OSS everywhere: version shown in the app ("1.3.2-OSS",
         // "1.3.2-OSS-full") and the APK names. The update check ignores the suffix.
         versionNameSuffix = "-OSS"
