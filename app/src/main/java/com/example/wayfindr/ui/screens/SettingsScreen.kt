@@ -116,6 +116,7 @@ fun SettingsScreen(
         val pickerDoubleTap by dashConfig.pickerDoubleTap.collectAsState()
         val showJoystickTrail by dashConfig.showJoystickTrail.collectAsState()
         val showPhoneBattery by dashConfig.showPhoneBattery.collectAsState()
+        val joyDebounceMs by dashConfig.joyDebounceMs.collectAsState()
         WayfindrCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
             SettingRow(WayfindrIcons.Power, "Turn phone screen off", "Map keeps streaming to the dash",
                 control = { WayfindrToggle(screenOff) { screenOff = it } })
@@ -150,6 +151,11 @@ fun SettingsScreen(
             SettingRow(WayfindrIcons.Target, "Show joystick presses",
                 "Bottom-centre on the dash: last 4 presses as D / R / L, each shown for 2 s",
                 control = { WayfindrToggle(showJoystickTrail) { dashConfig.setShowJoystickTrail(it) } })
+            WayfindrDivider(Modifier.padding(horizontal = 6.dp))
+            SettingRow(WayfindrIcons.Target, "Joystick ghost-press filter",
+                if (joyDebounceMs == 0L) "Off: every press counts"
+                else "Ignore a different direction within $joyDebounceMs ms of the last press",
+                control = { MsStepper(joyDebounceMs) { dashConfig.setJoyDebounceMs(it) } })
             WayfindrDivider(Modifier.padding(horizontal = 6.dp))
             SettingRow(WayfindrIcons.Target, "Show phone battery on dash",
                 "Battery % above the ETA box, with a bolt while charging",
@@ -255,6 +261,23 @@ fun SettingsScreen(
 @Composable
 private fun SectionLabel(label: String) {
     Eyebrow(label, Modifier.padding(top = 22.dp, bottom = 9.dp, start = 4.dp))
+}
+
+/** − value + in 25 ms steps, for timing settings tuned on the bike. */
+@Composable
+private fun MsStepper(ms: Long, step: Long = 25L, onChange: (Long) -> Unit) {
+    @Composable
+    fun StepBtn(label: String, delta: Long) = Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background(Surf2)
+            .border(1.dp, Line, RoundedCornerShape(9.dp)).clickable { onChange(ms + delta) },
+    ) { Text(label, color = TextHi, fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        StepBtn("−", -step)
+        Text("$ms", color = TextHi, fontSize = 13.sp, fontFamily = GeistFamily,
+            modifier = Modifier.widthIn(min = 44.dp).padding(horizontal = 4.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        StepBtn("+", step)
+    }
 }
 
 @Composable

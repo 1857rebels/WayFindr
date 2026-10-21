@@ -253,6 +253,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     private fun wakeFrameLoop() { frameWake.trySend(Unit) }
     // Recent joystick presses for the optional bottom-centre "DDRR" box.
     private val joyTrail = JoystickTrail()
+    // Drops the stick's ghost second direction (pushed RIGHT, dash sent RIGHT + DOWN).
+    private val joyDebounce = JoystickDebounce(setOf(BTN_JOY_DOWN, BTN_JOY_RIGHT, BTN_JOY_LEFT, BTN_JOY_UP))
     private var lastRedrawAt = 0L
 
     // Ride diagnostics: one-shot "first frame" marker + a throttle for the periodic ride line.
@@ -345,6 +347,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         // seen twice in ride logs and it completes the run 12/13/14/15 = up/right/left/down (unconfirmed).
         // CENTRE click is 0x18 — the dash uses it to enter its own media controls, so we leave it alone.
         private const val BTN_JOY_DOWN = 0x15
+        private const val BTN_JOY_UP = 0x12   // unconfirmed, see above
         // Destination-list gesture (Settings → "Destination list: double-tap"): press DOWN, or
         // double-tap LEFT or RIGHT (same direction twice within DOUBLE_TAP_MS).
         private const val DOUBLE_TAP_MS = 500L
@@ -583,8 +586,13 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         // separate HOME button is intentionally untouched — it does the dash's native exit; its code
         // just falls through to the logged-else branch. Codes verified fw 11.63: IN=0x18, RIGHT=0x09,
         // LEFT=0x0A, DOWN=0x07. Every unmatched code is shown in ui.lastButton so we can retune.
-        session.onButton = { btn ->
+        session.onButton = onButton@{ btn ->
             val code = btn.toInt() and 0xFF
+            joyDebounce.drop(code, System.currentTimeMillis(), dashConfig.joyDebounceMs.value)?.let { gap ->
+                com.example.wayfindr.data.RideDiagnostics.log("button",
+                    "0x%02X ignored: %d ms after the last press (filter %d ms)".format(code, gap, dashConfig.joyDebounceMs.value))
+                return@onButton
+            }
             when (code) {   // physical directions: 0x15 down, 0x13 right, 0x14 left
                 BTN_JOY_DOWN -> 'D'; BTN_JOY_RIGHT -> 'R'; BTN_JOY_LEFT -> 'L'; else -> null
             }?.let { if (dashConfig.showJoystickTrail.value) joyTrail.add(it, System.currentTimeMillis()) }
