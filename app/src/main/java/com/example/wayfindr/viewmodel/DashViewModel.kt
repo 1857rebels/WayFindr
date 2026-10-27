@@ -173,6 +173,10 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile private var panX = 0f
     @Volatile private var panY = 0f
     @Volatile private var zoom = 19          // nav-level zoom on the dash (street-level default)
+    private val autoZoom = AutoZoom()
+    // The next turn as the frame loop last saw it: which one (cumulative m) — for the joystick's
+    // "hold until the next turn" — and how far, plus the "then" turn when it's close behind.
+    @Volatile private var azTurnKey: Double? = null
     @Volatile private var headingUp = true
     @Volatile private var mapDark = false
     @Volatile private var followMode = true
@@ -1196,8 +1200,21 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun zoomInCode()  = if (dashConfig.invertZoom.value) BTN_MAP_ZOOM_OUT else BTN_MAP_ZOOM_IN
     private fun zoomOutCode() = if (dashConfig.invertZoom.value) BTN_MAP_ZOOM_IN else BTN_MAP_ZOOM_OUT
-    fun zoomIn()  = setZoom(zoom + 1)
-    fun zoomOut() = setZoom(zoom - 1)
+    fun zoomIn()  { autoZoom.manual(System.currentTimeMillis(), azTurnKey); setZoom(zoom + 1) }
+    fun zoomOut() { autoZoom.manual(System.currentTimeMillis(), azTurnKey); setZoom(zoom - 1) }
+
+    /** Auto zoom step for this tick (no-op when off, manual-paused, or nothing changes). */
+    private fun applyAutoZoom(loc: android.location.Location?, turnM: Double?, thenGapM: Double?) {
+        if (!dashConfig.autoZoom.value || loc == null) return
+        val d = autoZoom.update(AutoZoom.Input(
+            nowMs = System.currentTimeMillis(), speedMps = loc.speed, lat = loc.latitude,
+            turnM = turnM, turnKey = azTurnKey, thenGapM = thenGapM,
+            current = zoom, range = zoomRange(), headingUp = headingUp,
+        )) ?: return
+        if (d.zoom == zoom) return
+        com.example.wayfindr.data.RideDiagnostics.log("zoom", "auto $zoom → ${d.zoom} (${d.reason})")
+        setZoom(d.zoom, auto = true)
+    }
     /**
      * Dash zoom range: 11–20, narrowed to the offline file's own zoom levels while it's the map
      * source, so the joystick can't zoom into enlarged (blurry) or missing tiles.
@@ -1211,7 +1228,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     /** Zoom before the offline range pulled it in, restored when the offline map is turned off. */
     @Volatile private var zoomBeforeOfflineClamp: Int? = null
 
-    private fun setZoom(z: Int) {
+    private fun setZoom(z: Int, auto: Boolean = false) {
         val clamped = z.coerceIn(zoomRange())
         if (clamped == zoom) return
         zoom = clamped
@@ -1220,7 +1237,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
         // gap with scaled neighbouring-zoom tiles), and warm the real tiles for the new level so
         // the scaled view sharpens in quickly.
         lastSignature = ""
-        zoomBadgeUntilMs = System.currentTimeMillis() + ZOOM_BADGE_MS
+        if (!auto) zoomBadgeUntilMs = System.currentTimeMillis() + ZOOM_BADGE_MS   // no badge for auto zoom
         wakeFrameLoop()
         // No forced IDR here any more: zoom keyframes came out 65–100 KB (ride 2026-10-16), i.e.
         // 3–4 s of the dash's ~25 KB/s video budget in one burst, and the new view took seconds
@@ -1421,9 +1438,18 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
 
         var offRoute = false
         var recalculating = false
+        var azTurnM: Double? = null
+        var azThenGapM: Double? = null
+        azTurnKey = null
 
         if (r != null && loc != null) {
             val ns = trackProgress(r, GeoPoint(loc.latitude, loc.longitude))
+            ns.nextManeuver?.let { m ->
+                azTurnKey = m.cumulativeMeters
+                azTurnM = ns.nextTurnM
+                azThenGapM = ns.secondManeuver?.let { it.cumulativeMeters - m.cumulativeMeters }
+                    ?.takeIf { it <= AutoZoom.THEN_TURN_MAX_GAP_M }
+            }
             // If GPS bearing is weak or we are at low speed, use the route's current
             // segment bearing as the target so the map points the right way immediately.
             if (!loc.hasBearing() || loc.speed < BEARING_MIN_SPEED) {
@@ -1552,6 +1578,8 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             )
             sendPaceMaxMs = 0L  // reset the worst-case window each diag line
         }
+
+        applyAutoZoom(loc, azTurnM.takeIf { !offRoute }, azThenGapM.takeIf { !offRoute })
 
         // ── Predictive, framerate-independent camera (CarPlay-smooth) ──
         // Capture each fresh GPS fix + its velocity for dead-reckoning.

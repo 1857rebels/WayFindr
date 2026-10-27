@@ -112,6 +112,7 @@ fun SettingsScreen(
             }
         }
         val invertZoom by dashConfig.invertZoom.collectAsState()
+        val autoZoom by dashConfig.autoZoom.collectAsState()
         val sharperMap by dashConfig.sharperMap.collectAsState()
         val pickerDoubleTap by dashConfig.pickerDoubleTap.collectAsState()
         val showJoystickTrail by dashConfig.showJoystickTrail.collectAsState()
@@ -138,6 +139,11 @@ fun SettingsScreen(
             SettingRow(WayfindrIcons.Plus, "Import offline map",
                 if (importing) "Importing…" else "$mapStatus · or copy a raster .mbtiles to Android/data/com.wayfindr.app/files/maps",
                 control = {}, onClick = { if (!importing) importLauncher.launch(arrayOf("*/*")) })
+            WayfindrDivider(Modifier.padding(horizontal = 6.dp))
+            SettingRow(WayfindrIcons.Target, "Auto zoom",
+                if (autoZoom) "Zooms out with speed and fits the next turn on the dash · joystick zoom pauses it until the turn"
+                else "Off: zoom only with the joystick",
+                control = { WayfindrToggle(autoZoom) { dashConfig.setAutoZoom(it) } })
             WayfindrDivider(Modifier.padding(horizontal = 6.dp))
             SettingRow(WayfindrIcons.Sync, "Invert joystick zoom",
                 if (invertZoom) "Right zooms in · left zooms out" else "Left zooms in · right zooms out",

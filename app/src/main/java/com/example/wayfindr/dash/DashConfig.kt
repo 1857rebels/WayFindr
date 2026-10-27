@@ -83,6 +83,9 @@ class DashConfig private constructor(context: Context) {
     private val _showJoystickTrail = MutableStateFlow(prefs.getBoolean(KEY_JOY_TRAIL, false))
     /** Show recent joystick presses ("DDRR") bottom-centre on the dash. */
     val showJoystickTrail: StateFlow<Boolean> = _showJoystickTrail.asStateFlow()
+    private val _autoZoom = MutableStateFlow(prefs.getBoolean(KEY_AUTO_ZOOM, true))
+    /** Dash zoom follows speed and frames the next turn ([com.example.wayfindr.viewmodel.AutoZoom]). */
+    val autoZoom: StateFlow<Boolean> = _autoZoom.asStateFlow()
     private val _joyDebounceMs = MutableStateFlow(prefs.getLong(KEY_JOY_DEBOUNCE, DEFAULT_JOY_DEBOUNCE_MS))
     /** Ignore a joystick press in a different direction this soon after the last one (0 = off). */
     val joyDebounceMs: StateFlow<Long> = _joyDebounceMs.asStateFlow()
@@ -169,6 +172,11 @@ class DashConfig private constructor(context: Context) {
         _showJoystickTrail.value = on
     }
 
+    fun setAutoZoom(on: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_ZOOM, on).apply()
+        _autoZoom.value = on
+    }
+
     fun setJoyDebounceMs(ms: Long) {
         val v = ms.coerceIn(0L, MAX_JOY_DEBOUNCE_MS)
         prefs.edit().putLong(KEY_JOY_DEBOUNCE, v).apply()
@@ -201,6 +209,7 @@ class DashConfig private constructor(context: Context) {
         private const val KEY_JOY_TRAIL = "joystick_trail"
         private const val KEY_PHONE_BATTERY = "phone_battery"
         private const val KEY_JOY_DEBOUNCE = "joystick_debounce_ms"
+        private const val KEY_AUTO_ZOOM = "auto_zoom"
         /** Ghost presses in the ride logs came ~250 ms after the real one (2026-10-19/20). */
         const val DEFAULT_JOY_DEBOUNCE_MS = 300L
         const val MAX_JOY_DEBOUNCE_MS = 1_000L
