@@ -485,6 +485,10 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
             dashConfig.ssid = learned
             _ui.update { it.copy(ssid = learned) }
         }
+        wifiManager.onBssidResolved = { b ->
+            if (b != dashConfig.bssid) com.example.wayfindr.data.RideDiagnostics.log("wifi", "dash BSSID learned: $b")
+            dashConfig.bssid = b
+        }
 
         viewModelScope.launch {
             combine(wifiManager.state, session.state) { ws, st ->
@@ -695,7 +699,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
                 session.connect(_ui.value.ssid, wifiManager.network)
             // Known SSID (stored or just found by scan) → exact connect + correct auth.
             dashConfig.ssid.isNotBlank() ->
-                wifiManager.connect(dashConfig.ssid, dashConfig.password)
+                wifiManager.connect(dashConfig.ssid, dashConfig.password, bssid = dashConfig.bssid)
             // Couldn't find it in scan results — fall back to prefix discovery so we at
             // least associate (auth may still need the SSID; a rescan usually fixes it).
             else ->
@@ -1029,6 +1033,28 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+
+    /**
+     * Connect the moment Wi‑Fi comes on after "Turn on Wi‑Fi", without waiting to return to the
+     * app. Connecting right after the radio starts works best: it has just scanned and hasn't
+     * joined another network yet.
+     */
+    private val wifiOnRx = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            val on = intent?.getIntExtra(android.net.wifi.WifiManager.EXTRA_WIFI_STATE, -1) ==
+                android.net.wifi.WifiManager.WIFI_STATE_ENABLED
+            if (on && _ui.value.needsWifiOn) {
+                android.util.Log.i("DashViewModel", "Wi‑Fi turned on — connecting")
+                connect()
+            }
+        }
+    }
+
+    init {
+        androidx.core.content.ContextCompat.registerReceiver(getApplication(), wifiOnRx,
+            android.content.IntentFilter(android.net.wifi.WifiManager.WIFI_STATE_CHANGED_ACTION),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
 
     init {
         // Declared after the property it registers (init blocks run in declaration order).
@@ -2134,6 +2160,7 @@ class DashViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         super.onCleared()
         debugButtonRx?.let { runCatching { getApplication<android.app.Application>().unregisterReceiver(it) } }
+        runCatching { getApplication<android.app.Application>().unregisterReceiver(wifiOnRx) }
         stopRecording()        // save the in-progress ride if the app is closed mid-session
         session.disconnect()
         wifiManager.disconnect()

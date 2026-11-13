@@ -100,6 +100,11 @@ class DashConfig private constructor(context: Context) {
         get() = prefs.getString(KEY_SSID, "") ?: ""
         set(v) = prefs.edit().putString(KEY_SSID, v).apply()
 
+    /** The dash's access-point MAC, learned on first connect; pins the Wi‑Fi request to it. */
+    var bssid: String
+        get() = prefs.getString(KEY_BSSID, "") ?: ""
+        set(v) = prefs.edit().putString(KEY_BSSID, v).apply()
+
     var password: String
         get() = prefs.getString(KEY_PASSWORD, DEFAULT_PASSWORD) ?: DEFAULT_PASSWORD
         set(v) = prefs.edit().putString(KEY_PASSWORD, v).apply()
@@ -108,7 +113,7 @@ class DashConfig private constructor(context: Context) {
     val needsDiscovery: Boolean get() = ssid.isBlank()
 
     /** Forget the learned dash so the next connect re-runs prefix discovery. */
-    fun forgetDash() { ssid = "" }
+    fun forgetDash() { ssid = ""; bssid = "" }
 
     fun setMapDarkMode(dark: Boolean) {
         prefs.edit().putBoolean(KEY_MAP_DARK, dark).apply()
@@ -178,6 +183,7 @@ class DashConfig private constructor(context: Context) {
     companion object {
         private const val KEY_PREFIX   = "ssid_prefix"
         private const val KEY_SSID     = "ssid"
+        private const val KEY_BSSID    = "bssid"
         private const val KEY_PASSWORD = "password"
         private const val KEY_MAP_DARK = "map_dark"
         private const val KEY_MAP_DARK_AUTO = "map_dark_auto"
